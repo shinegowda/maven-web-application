@@ -1,0 +1,33 @@
+node
+{
+    properties([buildDiscarder(logRotator(artifactDaysToKeepStr: '', artifactNumToKeepStr: '', daysToKeepStr: '', numToKeepStr: '5')), pipelineTriggers([pollSCM('* * * * *')])])
+    def mavenHome = tool name:"maven 3.8.1"
+    stage('checkoutCode'){
+        git branch: 'development', credentialsId: '90ae1f2e-ce15-43b0-934d-955b0bd61af6', url: 'https://github.com/shinegowda/maven-web-application.git'
+    }
+    stage('Build')
+    {
+        sh "${mavenHome}/bin/mvn clean package"
+    }
+    stage('executeSonarQubeReport')
+    {
+        sh "${mavenHome}/bin/mvn sonar:sonar"
+    }
+    stage('uploadArtifactintoNexus')
+    {
+        sh "${mavenHome}/bin/mvn deploy"
+    }
+    stage('HostAppintoTomcat')
+    {
+        sshagent(['d1bc4d06-dcbd-475f-b562-df0c003f3c05']) {
+        sh "scp -o StrictHostKeyChecking=no target/maven-web-application.war ec2-user@18.209.11.156:/opt/apache-tomcat/webapps/"
+        }
+    }
+    stage('Email Notification')
+    {
+        emailext body: '''
+        Regards,
+        Shrinivas H H
+        ''', subject: '', to: 'shinegowda123@gmail.com'
+    }
+}
